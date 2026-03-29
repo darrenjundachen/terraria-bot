@@ -147,6 +147,50 @@ Each `.npz` file in `demos/` contains:
 }
 ```
 
+## Policy Network Architecture
+
+The agent uses Stable-Baselines3's **CnnPolicy** with the **NatureCNN** feature extractor:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Input: 3 × 120 × 160 RGB screenshot               │
+└──────────────────────┬──────────────────────────────┘
+                       │
+        ╔══════════════╧══════════════════╗
+        ║      NatureCNN Extractor        ║
+        ║                                 ║
+        ║  Conv2d(3→32, 8×8, stride=4)   ║
+        ║  ReLU  → 32 × 29 × 39          ║
+        ║                                 ║
+        ║  Conv2d(32→64, 4×4, stride=2)  ║
+        ║  ReLU  → 64 × 13 × 18          ║
+        ║                                 ║
+        ║  Conv2d(64→64, 3×3, stride=1)  ║
+        ║  ReLU  → 64 × 11 × 16          ║
+        ║                                 ║
+        ║  Flatten → 11,264               ║
+        ║  Linear(11264 → 512) + ReLU     ║
+        ╚══════════════╤══════════════════╝
+                       │
+            ┌──────────┴──────────┐
+            ▼                     ▼
+  ┌─────────────────┐   ┌─────────────────┐
+  │  Actor (Policy)  │   │ Critic (Value)  │
+  │                  │   │                 │
+  │ Linear(512→64)  │   │ Linear(512→64)  │
+  │ Tanh             │   │ Tanh            │
+  │ Linear(64→64)   │   │ Linear(64→64)   │
+  │ Tanh             │   │ Tanh            │
+  │ Linear(64→8) μ  │   │ Linear(64→1)    │
+  │ + log_std (8)    │   │                 │
+  └────────┬─────────┘   └────────┬────────┘
+           ▼                      ▼
+   Action ~ N(μ, σ²)         V(s) scalar
+   8-dim continuous
+```
+
+The actor and critic **share** the NatureCNN feature extractor but have **separate** MLP heads. Each action dimension is an independent Gaussian — actions are not normalized to sum to 1, allowing simultaneous key presses. Total parameters: ~5.8M.
+
 ## PPO Hyperparameters
 
 | Parameter | Value |
